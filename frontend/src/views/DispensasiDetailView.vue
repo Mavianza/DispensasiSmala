@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import AppNavbar from '@/components/AppNavbar.vue'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -12,7 +13,6 @@ const dispensasi = ref(null)
 const loading = ref(true)
 const error = ref('')
 
-// Form untuk approval (guru/admin)
 const approvalForm = ref({
   status: '',
   catatan: ''
@@ -20,25 +20,42 @@ const approvalForm = ref({
 const submittingApproval = ref(false)
 
 const user = computed(() => authStore.user)
-const canApprove = computed(() => 
+const canApprove = computed(() =>
   authStore.hasRole && authStore.hasRole('kesiswaan') && dispensasi.value?.status === 'pending'
 )
-const canEdit = computed(() => 
-  user.value?.role === 'siswa' && 
-  dispensasi.value?.user_id === user.value?.id && 
+const canEdit = computed(() =>
+  user.value?.role === 'siswa' &&
+  dispensasi.value?.user_id === user.value?.id &&
   dispensasi.value?.status === 'pending'
 )
 const canDelete = computed(() => canEdit.value)
 
+// ── Fix tanggal ──
+function formatDate(date) {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleDateString('id-ID', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  })
+}
+function formatDateTime(date) {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  })
+}
+
 async function fetchDispensasi() {
   loading.value = true
   error.value = ''
-  
   try {
     const response = await api.get(`/dispensasi/${route.params.id}`)
     dispensasi.value = response.data.data
   } catch (err) {
-    console.error('Error fetching dispensasi:', err)
     error.value = 'Gagal memuat data dispensasi'
   } finally {
     loading.value = false
@@ -46,24 +63,18 @@ async function fetchDispensasi() {
 }
 
 async function handleApproval(status) {
-  if (!confirm(`Apakah Anda yakin ingin ${status === 'approved' ? 'menyetujui' : 'menolak'} dispensasi ini?`)) {
-    return
-  }
-
+  if (!confirm(`Apakah Anda yakin ingin ${status === 'approved' ? 'menyetujui' : 'menolak'} dispensasi ini?`)) return
   submittingApproval.value = true
   error.value = ''
-
   try {
     await api.put(`/dispensasi/${route.params.id}/status`, {
-      status: status,
+      status,
       catatan: approvalForm.value.catatan
     })
-
     alert(`Dispensasi berhasil ${status === 'approved' ? 'disetujui' : 'ditolak'}`)
     fetchDispensasi()
     approvalForm.value.catatan = ''
   } catch (err) {
-    console.error('Error updating status:', err)
     error.value = err.response?.data?.message || 'Gagal mengubah status dispensasi'
   } finally {
     submittingApproval.value = false
@@ -71,23 +82,19 @@ async function handleApproval(status) {
 }
 
 async function handleDelete() {
-  if (!confirm('Apakah Anda yakin ingin menghapus dispensasi ini?')) {
-    return
-  }
-
+  if (!confirm('Apakah Anda yakin ingin menghapus dispensasi ini?')) return
   try {
     await api.delete(`/dispensasi/${route.params.id}`)
     alert('Dispensasi berhasil dihapus')
     router.push('/dashboard')
   } catch (err) {
-    console.error('Error deleting dispensasi:', err)
     error.value = err.response?.data?.message || 'Gagal menghapus dispensasi'
   }
 }
 
 function getStatusBadgeClass(status) {
   const classes = {
-    pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    pending:  'bg-amber-100 text-amber-800 border-amber-300',
     approved: 'bg-green-100 text-green-800 border-green-300',
     rejected: 'bg-red-100 text-red-800 border-red-300'
   }
@@ -95,179 +102,153 @@ function getStatusBadgeClass(status) {
 }
 
 function getStatusText(status) {
-  const texts = {
-    pending: 'Menunggu Persetujuan',
-    approved: 'Disetujui',
-    rejected: 'Ditolak'
-  }
+  const texts = { pending: 'Menunggu Persetujuan', approved: 'Disetujui', rejected: 'Ditolak' }
   return texts[status] || status
 }
 
 function getStatusIcon(status) {
-  const icons = {
-    pending: '⏳',
-    approved: '✅',
-    rejected: '❌'
-  }
+  const icons = { pending: '⏳', approved: '✅', rejected: '❌' }
   return icons[status] || '📋'
 }
 
-onMounted(() => {
-  fetchDispensasi()
-})
-
-function printDispensasi() {
-  window.print()
-}
+onMounted(() => fetchDispensasi())
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <!-- Navbar -->
-    <nav class="bg-white shadow-md">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <router-link to="/dashboard" class="text-xl font-bold text-gray-800">
-              🎓 Sistem Dispensasi
-            </router-link>
-          </div>
-          <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-600">{{ user?.name }}</span>
-          </div>
-        </div>
-      </div>
-    </nav>
+  <div class="min-h-screen bg-gray-50">
+    <AppNavbar />
 
-    <!-- Content -->
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Back Button -->
-      <div class="mb-6 flex justify-between items-center">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-5">
+
+      <!-- Back & Actions -->
+      <div class="flex items-center justify-between">
         <router-link
           to="/dispensasi"
-          class="inline-flex items-center text-blue-600 hover:text-blue-800"
+          class="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-800 font-semibold transition"
         >
           ← Kembali ke Daftar
         </router-link>
 
-        <!-- Action Buttons -->
         <div v-if="dispensasi && !loading" class="flex gap-2 no-print">
           <router-link
             v-if="canEdit"
             :to="`/dispensasi/${dispensasi.id}/edit`"
-            class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition"
           >
             ✏️ Edit
           </router-link>
-          
           <button
             v-if="canDelete"
             @click="handleDelete"
-            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition"
           >
             🗑️ Hapus
           </button>
         </div>
       </div>
 
-      <!-- Error Alert -->
-      <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-        <p>❌ {{ error }}</p>
+      <!-- Error -->
+      <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+        ❌ {{ error }}
       </div>
 
       <!-- Loading -->
-      <div v-if="loading" class="bg-white rounded-lg shadow-md p-12 text-center">
-        <p class="text-gray-500">Loading...</p>
+      <div v-if="loading" class="bg-white rounded-xl shadow-sm border border-gray-100 py-16 text-center">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mb-4"></div>
+        <p class="text-sm text-gray-400">Memuat data...</p>
       </div>
 
-      <!-- Detail Dispensasi -->
-      <div v-else-if="dispensasi" class="space-y-6">
-        <!-- Status Card -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <div class="flex items-center justify-between">
+      <div v-else-if="dispensasi" class="space-y-5">
+
+        <!-- ── Status Card ── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 class="text-2xl font-bold text-gray-800 mb-2">
-                Detail Dispensasi #{{ dispensasi.id }}
-              </h1>
-              <p class="text-gray-600 text-sm">
-                Diajukan pada {{ new Date(dispensasi.created_at).toLocaleString('id-ID') }}
+              <p class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Detail Dispensasi</p>
+              <h1 class="text-xl font-bold text-gray-800 mb-1">#{{ dispensasi.id }}</h1>
+              <p class="text-sm text-gray-500">
+                Diajukan pada {{ formatDateTime(dispensasi.created_at) }}
               </p>
             </div>
-            <div class="text-center">
-              <div class="text-4xl mb-2">{{ getStatusIcon(dispensasi.status) }}</div>
-              <span :class="getStatusBadgeClass(dispensasi.status)" class="px-4 py-2 text-sm font-semibold rounded-full border">
+            <div class="flex items-center gap-3 flex-shrink-0">
+              <span class="text-3xl">{{ getStatusIcon(dispensasi.status) }}</span>
+              <span
+                :class="getStatusBadgeClass(dispensasi.status)"
+                class="px-4 py-1.5 text-sm font-semibold rounded-full border"
+              >
                 {{ getStatusText(dispensasi.status) }}
               </span>
             </div>
           </div>
         </div>
 
-        <!-- Data Siswa -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-lg font-semibold text-gray-800 mb-4">👤 Data Siswa</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- ── Data Siswa ── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 bg-blue-50/50 flex items-center gap-2">
+            <span>👤</span>
+            <h2 class="text-sm font-semibold text-gray-700">Data Siswa</h2>
+          </div>
+          <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <p class="text-sm text-gray-500">Nama Siswa</p>
-              <p class="font-semibold text-gray-800">{{ dispensasi.siswa?.name }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">Nama Siswa</p>
+              <p class="text-sm font-semibold text-gray-800">{{ dispensasi.siswa?.name || '-' }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">Kelas</p>
-              <p class="font-semibold text-gray-800">{{ dispensasi.kelas?.nama_kelas }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">Kelas</p>
+              <p class="text-sm font-semibold text-gray-800">{{ dispensasi.kelas?.nama_kelas || '-' }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">NISN</p>
-              <p class="font-semibold text-gray-800">{{ dispensasi.siswa?.nisn || '-' }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">NISN</p>
+              <p class="text-sm font-semibold text-gray-800">{{ dispensasi.siswa?.nisn || '-' }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">No. Telepon</p>
-              <p class="font-semibold text-gray-800">{{ dispensasi.siswa?.no_telepon || '-' }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">No. Telepon</p>
+              <p class="text-sm font-semibold text-gray-800">{{ dispensasi.siswa?.no_telepon || '-' }}</p>
             </div>
           </div>
         </div>
 
-        <!-- Detail Dispensasi -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-lg font-semibold text-gray-800 mb-4">📋 Detail Dispensasi</h2>
-          <div class="space-y-4">
+        <!-- ── Detail Dispensasi ── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 bg-primary-50/50 flex items-center gap-2">
+            <span>📋</span>
+            <h2 class="text-sm font-semibold text-gray-700">Detail Dispensasi</h2>
+          </div>
+          <div class="p-6 space-y-5">
             <div>
-              <p class="text-sm text-gray-500">Tanggal</p>
-              <p class="font-semibold text-gray-800">
-                {{ new Date(dispensasi.tanggal).toLocaleDateString('id-ID', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                }) }}
+              <p class="text-xs text-gray-400 font-medium mb-1">Tanggal</p>
+              <p class="text-sm font-semibold text-gray-800">{{ formatDate(dispensasi.tanggal) }}</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <p class="text-xs text-gray-400 font-medium mb-1">Jam Mulai</p>
+                <p class="text-sm font-semibold text-gray-800">{{ dispensasi.jam_mulai || '-' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400 font-medium mb-1">Jam Selesai</p>
+                <p class="text-sm font-semibold text-gray-800">{{ dispensasi.jam_selesai || '-' }}</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs text-gray-400 font-medium mb-1">Mata Pelajaran yang Ditinggalkan</p>
+              <p class="text-sm font-semibold text-gray-800">{{ dispensasi.mata_pelajaran || '-' }}</p>
+            </div>
+
+            <div>
+              <p class="text-xs text-gray-400 font-medium mb-1">Keperluan / Alasan</p>
+              <p class="text-sm text-gray-700 whitespace-pre-line leading-relaxed bg-gray-50 rounded-lg px-4 py-3">
+                {{ dispensasi.keperluan || '-' }}
               </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p class="text-sm text-gray-500">Jam Mulai</p>
-                <p class="font-semibold text-gray-800">{{ dispensasi.jam_mulai }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Jam Selesai</p>
-                <p class="font-semibold text-gray-800">{{ dispensasi.jam_selesai }}</p>
-              </div>
-            </div>
-
-            <div>
-              <p class="text-sm text-gray-500">Mata Pelajaran yang Ditinggalkan</p>
-              <p class="font-semibold text-gray-800">{{ dispensasi.mata_pelajaran }}</p>
-            </div>
-
-            <div>
-              <p class="text-sm text-gray-500">Keperluan/Alasan</p>
-              <p class="text-gray-800 whitespace-pre-line">{{ dispensasi.keperluan }}</p>
-            </div>
-
             <div v-if="dispensasi.surat_dispensasi">
-              <p class="text-sm text-gray-500 mb-2">Surat Dispensasi</p>
-              <a 
+              <p class="text-xs text-gray-400 font-medium mb-2">Surat Dispensasi</p>
+              <a
                 :href="`http://127.0.0.1:8000/storage/${dispensasi.surat_dispensasi}`"
                 target="_blank"
-                class="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                class="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
               >
                 📎 Lihat File
               </a>
@@ -275,120 +256,135 @@ function printDispensasi() {
           </div>
         </div>
 
-        <!-- Approval Info (jika sudah di-approve/reject) -->
-        <div v-if="dispensasi.status !== 'pending'" class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-lg font-semibold text-gray-800 mb-4">
-            {{ dispensasi.status === 'approved' ? '✅ Informasi Persetujuan' : '❌ Informasi Penolakan' }}
-          </h2>
-          <div class="space-y-3">
+        <!-- ── Informasi Persetujuan / Penolakan ── -->
+        <div
+          v-if="dispensasi.status !== 'pending'"
+          class="bg-white rounded-xl shadow-sm border overflow-hidden"
+          :class="dispensasi.status === 'approved' ? 'border-green-200' : 'border-red-200'"
+        >
+          <div
+            class="px-6 py-4 border-b flex items-center gap-2"
+            :class="dispensasi.status === 'approved' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'"
+          >
+            <span>{{ dispensasi.status === 'approved' ? '✅' : '❌' }}</span>
+            <h2 class="text-sm font-semibold text-gray-700">
+              {{ dispensasi.status === 'approved' ? 'Informasi Persetujuan' : 'Informasi Penolakan' }}
+            </h2>
+          </div>
+          <div class="p-6 space-y-4">
             <div>
-              <p class="text-sm text-gray-500">Diproses oleh</p>
-              <p class="font-semibold text-gray-800">{{ dispensasi.approver?.name }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">Diproses oleh</p>
+              <p class="text-sm font-semibold text-gray-800">{{ dispensasi.approver?.name || '-' }}</p>
             </div>
             <div v-if="dispensasi.catatan">
-              <p class="text-sm text-gray-500">Catatan</p>
-              <p class="text-gray-800">{{ dispensasi.catatan }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">Catatan</p>
+              <p class="text-sm text-gray-700 bg-gray-50 rounded-lg px-4 py-3">{{ dispensasi.catatan }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">Waktu Proses</p>
-              <p class="text-gray-800">{{ new Date(dispensasi.updated_at).toLocaleString('id-ID') }}</p>
+              <p class="text-xs text-gray-400 font-medium mb-1">Waktu Proses</p>
+              <p class="text-sm text-gray-800">{{ formatDateTime(dispensasi.updated_at) }}</p>
             </div>
           </div>
         </div>
 
-        <!-- Approval Form (untuk guru/admin jika status pending) -->
-        <div v-if="canApprove" class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-lg font-semibold text-gray-800 mb-4">⚡ Aksi Persetujuan</h2>
-          <p class="text-sm text-gray-600 mb-4">
-            Anda memiliki hak untuk approve/reject karena memiliki role: 
-            <span class="font-semibold">{{ authStore.getRoleDisplayNames.join(', ') }}</span>
-          </p>
-
-          
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Catatan (Opsional)
-            </label>
-            <textarea
-              v-model="approvalForm.catatan"
-              rows="3"
-              placeholder="Tambahkan catatan jika diperlukan..."
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            ></textarea>
+        <!-- ── Approval Form ── -->
+        <div v-if="canApprove" class="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+          <div class="px-6 py-4 border-b border-amber-100 bg-amber-50 flex items-center gap-2">
+            <span>⚡</span>
+            <h2 class="text-sm font-semibold text-gray-700">Aksi Persetujuan</h2>
           </div>
-
-          <div class="flex gap-4">
-            <button
-              @click="handleApproval('approved')"
-              :disabled="submittingApproval"
-              class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              <span v-if="submittingApproval">Processing...</span>
-              <span v-else>✅ Setujui</span>
-            </button>
-
-            <button
-              @click="handleApproval('rejected')"
-              :disabled="submittingApproval"
-              class="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              <span v-if="submittingApproval">Processing...</span>
-              <span v-else>❌ Tolak</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Timeline -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h2 class="text-lg font-semibold text-gray-800 mb-4">🕐 Timeline</h2>
-          <div class="space-y-4">
-            <div class="flex items-start">
-              <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <span class="text-lg">📝</span>
-              </div>
-              <div class="ml-4">
-                <p class="font-semibold text-gray-800">Dispensasi Diajukan</p>
-                <p class="text-sm text-gray-500">{{ new Date(dispensasi.created_at).toLocaleString('id-ID') }}</p>
-              </div>
+          <div class="p-6">
+            <p class="text-sm text-gray-500 mb-4">
+              Anda memiliki hak untuk approve/reject sebagai
+              <span class="font-semibold text-gray-700">{{ authStore.getRoleDisplayNames.join(', ') }}</span>
+            </p>
+            <div class="mb-4">
+              <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                Catatan <span class="text-gray-400 normal-case font-normal">(opsional)</span>
+              </label>
+              <textarea
+                v-model="approvalForm.catatan"
+                rows="3"
+                placeholder="Tambahkan catatan jika diperlukan..."
+                class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none transition resize-none"
+              ></textarea>
             </div>
-
-            <div v-if="dispensasi.status !== 'pending'" class="flex items-start">
-              <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center" 
-                   :class="dispensasi.status === 'approved' ? 'bg-green-100' : 'bg-red-100'">
-                <span class="text-lg">{{ dispensasi.status === 'approved' ? '✅' : '❌' }}</span>
-              </div>
-              <div class="ml-4">
-                <p class="font-semibold text-gray-800">
-                  {{ dispensasi.status === 'approved' ? 'Dispensasi Disetujui' : 'Dispensasi Ditolak' }}
-                </p>
-                <p class="text-sm text-gray-500">{{ new Date(dispensasi.updated_at).toLocaleString('id-ID') }}</p>
-                <p class="text-sm text-gray-600 mt-1">oleh {{ dispensasi.approver?.name }}</p>
-              </div>
+            <div class="flex gap-3">
+              <button
+                @click="handleApproval('approved')"
+                :disabled="submittingApproval"
+                class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-2.5 rounded-lg text-sm font-semibold transition"
+              >
+                {{ submittingApproval ? 'Memproses...' : '✅ Setujui' }}
+              </button>
+              <button
+                @click="handleApproval('rejected')"
+                :disabled="submittingApproval"
+                class="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white py-2.5 rounded-lg text-sm font-semibold transition"
+              >
+                {{ submittingApproval ? 'Memproses...' : '❌ Tolak' }}
+              </button>
             </div>
           </div>
         </div>
+
+        <!-- ── Timeline ── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+            <span>🕐</span>
+            <h2 class="text-sm font-semibold text-gray-700">Timeline</h2>
+          </div>
+          <div class="p-6">
+            <div class="relative">
+              <!-- Garis vertikal -->
+              <div class="absolute left-4 top-5 bottom-5 w-0.5 bg-gray-200"></div>
+
+              <div class="space-y-6">
+                <!-- Diajukan -->
+                <div class="flex items-start gap-4 relative">
+                  <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center z-10 text-sm">
+                    📝
+                  </div>
+                  <div class="pt-0.5">
+                    <p class="text-sm font-semibold text-gray-800">Dispensasi Diajukan</p>
+                    <p class="text-xs text-gray-400 mt-0.5">{{ formatDateTime(dispensasi.created_at) }}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">oleh {{ dispensasi.siswa?.name }}</p>
+                  </div>
+                </div>
+
+                <!-- Pending indicator jika masih menunggu -->
+                <div v-if="dispensasi.status === 'pending'" class="flex items-start gap-4 relative">
+                  <div class="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center z-10 text-sm">
+                    ⏳
+                  </div>
+                  <div class="pt-0.5">
+                    <p class="text-sm font-semibold text-amber-700">Menunggu Persetujuan</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Belum diproses</p>
+                  </div>
+                </div>
+
+                <!-- Disetujui / Ditolak -->
+                <div v-if="dispensasi.status !== 'pending'" class="flex items-start gap-4 relative">
+                  <div
+                    class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center z-10 text-sm"
+                    :class="dispensasi.status === 'approved' ? 'bg-green-100' : 'bg-red-100'"
+                  >
+                    {{ dispensasi.status === 'approved' ? '✅' : '❌' }}
+                  </div>
+                  <div class="pt-0.5">
+                    <p class="text-sm font-semibold text-gray-800">
+                      {{ dispensasi.status === 'approved' ? 'Dispensasi Disetujui' : 'Dispensasi Ditolak' }}
+                    </p>
+                    <p class="text-xs text-gray-400 mt-0.5">{{ formatDateTime(dispensasi.updated_at) }}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">oleh {{ dispensasi.approver?.name }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
-  </div>
-
-  <!-- Update Action Buttons -->
-  <div v-if="dispensasi && !loading" class="flex gap-2 no-print">
-   
-    
-    <router-link
-      v-if="canEdit"
-      :to="`/dispensasi/${dispensasi.id}/edit`"
-      class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-    >
-      ✏️ Edit
-    </router-link>
-    
-    <button
-      v-if="canDelete"
-      @click="handleDelete"
-      class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-    >
-      🗑️ Hapus
-    </button>
   </div>
 </template>

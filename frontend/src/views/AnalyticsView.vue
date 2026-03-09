@@ -8,6 +8,7 @@ import BarChart from '@/components/BarChart.vue'
 import DoughnutChart from '@/components/DoughnutChart.vue'
 import api from '@/services/api'
 
+
 const router = useRouter()
 const authStore = useAuthStore()
 
